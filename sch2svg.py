@@ -285,6 +285,7 @@ def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0]
                 if key == name:
                     return
         pos = int(par[7])
+        rot += int(par[6])
         if rot == 180:
             # Anchor is flipped but the text is not
             anchor = ["end", "middle", "begin"][2-int(pos/3) if mirror else int(pos/3)]
@@ -323,7 +324,7 @@ def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0]
         if h[5] == "0": continue
         pos = int(h[8])
         lrot = int(h[7])
-        if rot == 180:
+        if lrot == 180:
             # Anchor is flipped but the text is not
             anchor = ["end", "middle", "begin"][2-int(pos/3) if mirror else int(pos/3)]
             baseline = ["hanging", "middle", "baseline"][pos%3]
