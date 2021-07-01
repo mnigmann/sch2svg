@@ -10,7 +10,7 @@ colors = [
     "#0000ff",
     "#ffff00",
     "#00ffff",
-    "#bebebe"
+    "#bebebe",
     "#ff0000",
     "#00ff00",
     "#00ff00",
@@ -224,8 +224,10 @@ def polarToCartesian(centerX, centerY, radius, angleInDegrees):
     centerY + (radius * math.sin(angleInRadians))
   ];
 
+def getColor(ind, lock):
+    return colors[15] if lock else colors[int(ind)]
 
-def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0], rot=0, mirror=False, component_attributes=[], embedded=False):
+def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0], rot=0, mirror=False, component_attributes=[], embedded=False, locked=False):
     par = obj['param']
     # paths
     if obj['type'] == 'H':
@@ -236,7 +238,7 @@ def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0]
     if localoffset == [46500, 47100]: print(obj['type'], par, tcoords)
     # pins
     if obj['type'] in 'P':
-        out.write('<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}"/>\n'.format(*postTransformCoords(bounds, tcoords), colors[int(par[4])], MIN_THICKNESS))
+        out.write('<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}"/>\n'.format(*postTransformCoords(bounds, tcoords), getColor(par[4], locked), MIN_THICKNESS))
         target = tcoords[0:2] if par[6] == "0" else tcoords[2:4]
         for x in unpaired:
             if x[:2] == target:
@@ -245,7 +247,7 @@ def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0]
         else: unpaired.append(target+[1])
     # nets
     if obj['type'] in 'N':
-        out.write('<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}"/>\n'.format(*postTransformCoords(bounds, tcoords), colors[int(par[4])], MIN_THICKNESS))
+        out.write('<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}"/>\n'.format(*postTransformCoords(bounds, tcoords), getColor(par[4], locked), MIN_THICKNESS))
         for x in unpaired:
             if x[:2] == tcoords[:2]:
                 x[2] += 1
@@ -260,10 +262,10 @@ def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0]
         netsegments.append(tcoords[:4])
     # lines
     if obj['type'] == 'L':
-        out.write('<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}px" />\n'.format(*postTransformCoords(bounds, tcoords), colors[int(par[4])], max(MIN_THICKNESS, int(par[5]))))
+        out.write('<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}px" />\n'.format(*postTransformCoords(bounds, tcoords), getColor(par[4], locked), max(MIN_THICKNESS, int(par[5]))))
     # busses
     if obj['type'] == 'U':
-        out.write('<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}px" />\n'.format(*postTransformCoords(bounds, tcoords), colors[int(par[4])], 30))
+        out.write('<line x1="{}" y1="{}" x2="{}" y2="{}" stroke="{}" stroke-width="{}px" />\n'.format(*postTransformCoords(bounds, tcoords), getColor(par[4], locked), 30))
     # boxes
     if obj['type'] == 'B':
         box_corners = [par[0], par[1], par[0]+par[2], par[1]+par[3]]
@@ -300,7 +302,7 @@ def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0]
         if par[5] == "2" and "=" in text: text = text.split("=", 1)[0]
         fontsize = int(int(par[3])*1000/72)
         for i, part in enumerate(text.split("\n")):
-            out.write('<text text-anchor="{}" dominant-baseline="{}" transform="translate({}, {}) rotate({})" fill="{}" font-size="{}">{}</text>\n'.format(anchor, baseline, *postTransformCoords(bounds, [tcoords[0], tcoords[1] - i*LINE_SPACING*fontsize]), 360-rot if rot!=180 else 0, colors[int(par[2])], fontsize, string2svg(part)))
+            out.write('<text text-anchor="{}" dominant-baseline="{}" transform="translate({}, {}) rotate({})" fill="{}" font-size="{}">{}</text>\n'.format(anchor, baseline, *postTransformCoords(bounds, [tcoords[0], tcoords[1] - i*LINE_SPACING*fontsize]), 360-rot if rot!=180 else 0, getColor(par[2], locked), fontsize, string2svg(part)))
     # arcs
     if obj['type'] == 'A':
         start = polarToCartesian(par[0], par[1], par[2], par[3])
@@ -313,10 +315,10 @@ def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0]
             "M", *start, 
             "A", par[2], par[2], 0, largeArcFlag, 1, *end
         ])
-        out.write('<path transform="translate({}, {}) rotate({}) scale({}, -1)" d="{}" stroke="{}" fill-opacity="0" stroke-width="{}"/>'.format(*postTransformCoords(bounds, localoffset), 360-rot, m, d, colors[int(par[5])], max(int(par[6]), MIN_THICKNESS)))
+        out.write('<path transform="translate({}, {}) rotate({}) scale({}, -1)" d="{}" stroke="{}" fill-opacity="0" stroke-width="{}"/>'.format(*postTransformCoords(bounds, localoffset), 360-rot, m, d, getColor(par[5], locked), max(int(par[6]), MIN_THICKNESS)))
     # circles
     if obj['type'] == 'V':
-        out.write('<circle cx="{0}" cy="{1}" r="{2}" stroke="{3}" fill="{3}" stroke-width="{4}" fill-opacity="{5}"/>\n'.format(*postTransformCoords(bounds, tcoords), par[2], colors[par[3]], max(MIN_THICKNESS, par[4]), par[9]))
+        out.write('<circle cx="{0}" cy="{1}" r="{2}" stroke="{3}" fill="{3}" stroke-width="{4}" fill-opacity="{5}"/>\n'.format(*postTransformCoords(bounds, tcoords), par[2], getColor(par[3], locked), max(MIN_THICKNESS, par[4]), par[9]))
    
     
     
@@ -337,7 +339,7 @@ def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0]
         if h[6] == "0": text = key+"="+value
         if h[6] == "1": text = value
         if h[6] == "2": text = key
-        out.write('<text text-anchor="{}" dominant-baseline="{}" transform="translate({}, {}) rotate({})" fill="{}" font-size="{}"><tspan>{}</tspan></text>\n'.format(anchor, baseline, *postTransformCoords(bounds, preTransformCoords([int(h[1]), int(h[2])], localoffset, 0 if embedded else rot, mirror)), 360-lrot if lrot!=180 else 0, colors[int(h[3])], int(int(h[4])*1000/72), string2svg(text)))
+        out.write('<text text-anchor="{}" dominant-baseline="{}" transform="translate({}, {}) rotate({})" fill="{}" font-size="{}"><tspan>{}</tspan></text>\n'.format(anchor, baseline, *postTransformCoords(bounds, preTransformCoords([int(h[1]), int(h[2])], localoffset, 0 if embedded else rot, mirror)), 360-lrot if lrot!=180 else 0, getColor(h[3], locked), int(int(h[4])*1000/72), string2svg(text)))
 
 
 with open(in_file) as f:
@@ -372,10 +374,7 @@ with open(in_file) as f:
                 pbrac = parseObjects(pcont)
                 comp_attr = parseAttributes(obj['braces'])
                 for pobj in pbrac['objects']:
-                    writeSymbolObject(out, pobj, unpaired, netsegments, bounds, loffs, angle, mirror, comp_attr, par[-1].startswith("EMBEDDED"))
-                
-                if "R4" in str(comp_attr):
-                    print("R4", par)
+                    writeSymbolObject(out, pobj, unpaired, netsegments, bounds, loffs, angle, mirror, comp_attr, par[-1].startswith("EMBEDDED"), par[2]=="0")
                 
                 # Add in the attributes
                 for h, key, value in comp_attr:
@@ -395,7 +394,7 @@ with open(in_file) as f:
                     if h[6] == "0": text = key+"="+value
                     if h[6] == "1": text = value
                     if h[6] == "2": text = key
-                    out.write('<text text-anchor="{}" dominant-baseline="{}" transform="translate({}, {}) rotate({})" fill="{}" font-size="{}">{}</text>\n'.format(anchor, baseline, *postTransformCoords(bounds, [int(h[1]), int(h[2])]), 360-lrot if lrot!=180 else 0, colors[int(h[3])], int(int(h[4])*1000/72), string2svg(text)))
+                    out.write('<text text-anchor="{}" dominant-baseline="{}" transform="translate({}, {}) rotate({})" fill="{}" font-size="{}">{}</text>\n'.format(anchor, baseline, *postTransformCoords(bounds, [int(h[1]), int(h[2])]), 360-lrot if lrot!=180 else 0, getColor(h[3], par[2]=="0"), int(int(h[4])*1000/72), string2svg(text)))
         
         
         for x in unpaired:
