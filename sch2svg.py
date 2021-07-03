@@ -301,8 +301,13 @@ def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0]
         if par[5] == "1" and "=" in text: text = text.split("=", 1)[1]
         if par[5] == "2" and "=" in text: text = text.split("=", 1)[0]
         fontsize = int(int(par[3])*1000/72)
+        v_offset = 0 if baseline == "hanging" else LINE_SPACING*fontsize*text.count("\n")
+        if baseline == "middle": v_offset = v_offset / 2
         for i, part in enumerate(text.split("\n")):
-            out.write('<text text-anchor="{}" dominant-baseline="{}" transform="translate({}, {}) rotate({})" fill="{}" font-size="{}">{}</text>\n'.format(anchor, baseline, *postTransformCoords(bounds, [tcoords[0], tcoords[1] - i*LINE_SPACING*fontsize]), 360-rot if rot!=180 else 0, getColor(par[2], locked), fontsize, string2svg(part)))
+            out.write('<text text-anchor="{}" dominant-baseline="{}" transform="translate({}, {}) rotate({})" fill="{}" font-size="{}">{}</text>\n'.format(
+                anchor, baseline, *postTransformCoords(bounds, [tcoords[0], tcoords[1] - i*LINE_SPACING*fontsize + v_offset]), 360-rot if rot!=180 else 0, 
+                getColor(par[2], locked), fontsize, string2svg(part))
+            )
     # arcs
     if obj['type'] == 'A':
         start = polarToCartesian(par[0], par[1], par[2], par[3])
