@@ -3,43 +3,51 @@ import math
 import argparse
 
 colors = [
-    "#000000",
-    "#ffffff",
-    "#ff0000",
-    "#00ff00",
-    "#0000ff",
-    "#ffff00",
-    "#00ffff",
-    "#bebebe",
-    "#ff0000",
-    "#00ff00",
-    "#00ff00",
-    "#ffa500",
-    "#ffa500",
-    "#00ffff",
-    "#e5e5e5",
-    "#bebebe",
-    "#00ff00",
-    "#00ff00",
-    "#00ff00",
-    "#00ff00",
-    "#00ff00",
-    "#ffff00",
-    "#1e1e1e",
-    "#171717"
+    "#000000",      # BACKGROUND_COLOR          = #000000
+    "#ffffff",      # PIN_COLOR                 = #ffffff
+    "#ff0000",      # NET_ENDPOINT_COLOR        = #ff0000
+    "#00ff00",      # GRAPHIC_COLOR             = #00ff00
+    "#0000ff",      # NET_COLOR                 = #0000ff
+    "#ffff00",      # ATTRIBUTE_COLOR           = #ffff00
+    "#00ffff",      # LOGIC_BUBBLE_COLOR        = #00ffff
+    "#bebebe",      # DOTS_GRID_COLOR           = #bebebe
+    "#ff0000",      # DETACHED_ATTRIBUTE_COLOR  = #ff0000
+    "#00ff00",      # TEXT_COLOR                = #00ff00
+    "#00ff00",      # BUS_COLOR                 = #00ff00
+    "#ffa500",      # SELECT_COLOR              = #ffa500
+    "#ffa500",      # BOUNDINGBOX_COLOR         = #ffa500
+    "#00ffff",      # ZOOM_BOX_COLOR            = #00ffff
+    "#e5e5e5",      # STROKE_COLOR              = #e5e5e5
+    "#bebebe",      # LOCK_COLOR                = #bebebe
+    "#00ff00",      # OUTPUT_BACKGROUND_COLOR   = #00ff00
+    "#00ff00",      # FREESTYLE1_COLOR          = #00ff00
+    "#00ff00",      # FREESTYLE2_COLOR          = #00ff00
+    "#00ff00",      # FREESTYLE3_COLOR          = #00ff00
+    "#00ff00",      # FREESTYLE4_COLOR          = #00ff00
+    "#ffff00",      # JUNCTION_COLOR            = #ffff00
+    "#1e1e1e",      # MESH_GRID_MAJOR_COLOR     = #1e1e1e
+    "#171717"       # MESH_GRID_MINOR_COLOR     = #171717
 ]
-MIN_THICKNESS = 3   # Minimum thickness of any line.
+MIN_THICKNESS = 12   # Minimum thickness of any line.
 LINE_SPACING = 1    # Spacing (as a multiple of the font size) between lines of multiline text objects
 # Additional folders in which to search for symbols can be included here:
-SYMBOLS = ["/usr/share/gEDA/sym/"]
+# SYMBOLS = ["/usr/share/gEDA/sym/"]
+SYMBOLS = []
+# SYMBOLS = ["/Users/matthias/Downloads/geda-gaf-1.10.2/symbols/", "/Users/matthias/Downloads/symbols"]
 
 p = argparse.ArgumentParser(description="""Convert a gEDA/gschem schematic file (.sch) or symbol file (.sym) to an .svg image file""")
 p.add_argument("-i", "--in-file", type=lambda x: x if os.path.isfile(x) and (x.endswith(".sch") or x.endswith(".sym")) else p.error("File \"{}\" does not exist or is not a schematic or symbol file".format(x)), help="A .sch or .sym file from which a schematic is read", required=True)
 p.add_argument("-o", "--out-file", type=lambda x: x if x.endswith(".svg") else p.error("File \"{}\" must be an .svg file".format(x)), help="A .svg file to which an image of the schematic is written")
+p.add_argument("--colors", help="A file containing a list of colors")
+p.add_argument("-l", "--lib", nargs="*", action="store", help="Directories to be recursively searched for symbol files")
 a = p.parse_args()
+SYMBOLS += a.lib
+print("Looking for symbols in", SYMBOLS, a.lib)
 in_file = a.in_file
 out_file = a.out_file or os.path.splitext(in_file)[0]+".svg"
-
+if a.colors:
+    with open(a.colors) as f:
+        colors = [l[:7] for l in f]
 
 def locateFile(start, symname):
     ps = os.path.join(start, symname)
@@ -56,6 +64,7 @@ def parseObjects(cont):
     i=0
     objs = []
     bounds = [float("inf"), float("inf"), float("-inf"), float("-inf")]
+    attributes = []
     while i < len(ts):
         head = ts[i]
         i += 1
@@ -69,6 +78,8 @@ def parseObjects(cont):
             for x in range(length): 
                 data += ts[i] + "\n"
                 i += 1
+            if t == "T" and "=" in data:
+                attributes.append(data.split("=", 1))
         if i < len(ts): 
             next = ts[i]
             if next[0] == "[":
@@ -139,6 +150,9 @@ def parseObjects(cont):
                 else:
                     print("Component not found: '{}'".format(name))
                     hs[-1] = None
+                    continue
+            print(type(pcont), loffs, hs, name)
+            if hs[-1] is None: print(pcont)
             compb = preTransformCoords(parseObjects(pcont)['bounds'], loffs, 0 if "EMBEDDED" in hs[-1] else int(hs[4]), int(hs[5]))
             bounds[0] = min(bounds[0], compb[0])
             bounds[1] = min(bounds[1], compb[1])
@@ -148,7 +162,7 @@ def parseObjects(cont):
         
         objs.append({"head": head, "type": t, "param": hs[1:], "data": data, "braces": braces, "brackets": brackets})
         
-    return {"objects": objs, "bounds": bounds}
+    return {"objects": objs, "bounds": bounds, "attr": attributes}
 
 def parseAttributes(text):
     if not text.strip(): return []
@@ -227,7 +241,7 @@ def polarToCartesian(centerX, centerY, radius, angleInDegrees):
 def getColor(ind, lock):
     return colors[15] if lock else colors[int(ind)]
 
-def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0], rot=0, mirror=False, component_attributes=[], embedded=False, locked=False):
+def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0], rot=0, mirror=False, component_attributes=[], embedded=False, locked=False, slotdef=None):
     par = obj['param']
     # paths
     if obj['type'] == 'H':
@@ -275,7 +289,7 @@ def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0]
             abs(box_corners[0]-box_corners[2]), 
             abs(box_corners[1]-box_corners[3]), 
             colors[int(par[4])], 
-            max(1, int(par[5]))
+            max(MIN_THICKNESS, int(par[5]))
         ))
     # text
     if obj['type'] == 'T':
@@ -325,12 +339,14 @@ def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0]
     if obj['type'] == 'V':
         out.write('<circle cx="{0}" cy="{1}" r="{2}" stroke="{3}" fill="{3}" stroke-width="{4}" fill-opacity="{5}"/>\n'.format(*postTransformCoords(bounds, tcoords), par[2], getColor(par[3], locked), max(MIN_THICKNESS, par[4]), par[9]))
    
-    
-    
-    for h, key, value in parseAttributes(obj['braces']):
+    attr = parseAttributes(obj["braces"])
+    pinseq = None
+    for h, key, value in attr:
+        if key == "pinseq": pinseq = value
+    for h, key, value in attr:
         if h[5] == "0": continue
         pos = int(h[8])
-        lrot = int(h[7])
+        lrot = int(h[7]) if embedded else (int(h[7])+rot)%360
         if lrot == 180:
             # Anchor is flipped but the text is not
             anchor = ["end", "middle", "begin"][2-int(pos/3) if mirror else int(pos/3)]
@@ -341,6 +357,7 @@ def writeSymbolObject(out, obj, unpaired, netsegments, bounds, localoffset=[0,0]
         """
         anchor = ["begin", "middle", "end"][2-int(pos/3) if mirror else int(pos/3)]
         baseline = ["baseline", "middle", "hanging"][pos%3]"""
+        if slotdef and key == "pinnumber" and pinseq is not None: value = slotdef[int(pinseq)-1]
         if h[6] == "0": text = key+"="+value
         if h[6] == "1": text = value
         if h[6] == "2": text = key
@@ -353,7 +370,7 @@ with open(in_file) as f:
         parse = parseObjects(cont)
         bounds = parse['bounds']
         out.write('''<svg viewBox="0 0 {0} {1}" xmlns="http://www.w3.org/2000/svg">
-<rect x="0" y="0" width="{0}" height="{1}" style="fill:black;" />\n'''.format(bounds[2] - bounds[0] + 2000, bounds[3] - bounds[1] + 2000))
+<rect x="0" y="0" width="{0}" height="{1}" style="fill:{2};" />\n'''.format(bounds[2] - bounds[0] + 2000, bounds[3] - bounds[1] + 2000, colors[0]))
         unpaired = []
         netsegments = []
         for obj in parse['objects']:
@@ -378,8 +395,16 @@ with open(in_file) as f:
                         pcont = sym.read()
                 pbrac = parseObjects(pcont)
                 comp_attr = parseAttributes(obj['braces'])
+                slotdef = []
+                slot = None
+                for h, key, value in comp_attr:
+                    if key == "slot": slot = value
+                for x in pbrac["attr"]:
+                    if x[0] == "slotdef":
+                        x = x[1].split(":")
+                        if slot == x[0]: slotdef = [y.strip() for y in x[1].split(",")]
                 for pobj in pbrac['objects']:
-                    writeSymbolObject(out, pobj, unpaired, netsegments, bounds, loffs, angle, mirror, comp_attr, par[-1].startswith("EMBEDDED"), par[2]=="0")
+                    writeSymbolObject(out, pobj, unpaired, netsegments, bounds, loffs, angle, mirror, comp_attr, par[-1].startswith("EMBEDDED"), par[2]=="0", slotdef)
                 
                 # Add in the attributes
                 for h, key, value in comp_attr:
