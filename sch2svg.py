@@ -39,6 +39,8 @@ p = argparse.ArgumentParser(description="""Convert a gEDA/gschem schematic file 
 p.add_argument("-i", "--in-file", type=lambda x: x if os.path.isfile(x) and (x.endswith(".sch") or x.endswith(".sym")) else p.error("File \"{}\" does not exist or is not a schematic or symbol file".format(x)), help="A .sch or .sym file from which a schematic is read", required=True)
 p.add_argument("-o", "--out-file", type=lambda x: x if x.endswith(".svg") else p.error("File \"{}\" must be an .svg file".format(x)), help="A .svg file to which an image of the schematic is written")
 p.add_argument("--colors", help="A file containing a list of colors")
+p.add_argument("-g", dest="gmin", action="store_true", help="Include minor grid lines every 100px")
+p.add_argument("-G", dest="gmaj", action="store_true", help="Include major grid lines every 500px")
 p.add_argument("-l", "--lib", nargs="*", action="store", help="Directories to be recursively searched for symbol files")
 a = p.parse_args()
 SYMBOLS += a.lib
@@ -371,6 +373,33 @@ with open(in_file) as f:
         bounds = parse['bounds']
         out.write('''<svg viewBox="0 0 {0} {1}" xmlns="http://www.w3.org/2000/svg">
 <rect x="0" y="0" width="{0}" height="{1}" style="fill:{2};" />\n'''.format(bounds[2] - bounds[0] + 2000, bounds[3] - bounds[1] + 2000, colors[0]))
+
+        # Insert grid lines first so they appear at the bottom
+        if a.gmin:
+            gmin_x1 = 100 - ((bounds[0]-1000)%100)
+            gmin_x2 = bounds[2] - bounds[0] + 2000
+            gmin_y1 = 100 if (bounds[3]+1000)%100 == 0 else (bounds[3]+1000)%100
+            gmin_y2 = bounds[3] - bounds[1] + 2000
+            while gmin_x1 < gmin_x2:
+                out.write('<line x1="{0}" y1="0" x2="{0}" y2="{1}" stroke="{2}" stroke-thickness="{3}"/>\n'.format(gmin_x1, gmin_y2, colors[23], GRID_THICKNESS))
+                gmin_x1 += 100
+            while gmin_y1 < gmin_y2:
+                out.write('<line x1="0" y1="{0}" x2="{1}" y2="{0}" stroke="{2}" stroke-thickness="{3}"/>\n'.format(gmin_y1, gmin_x2, colors[23], GRID_THICKNESS))
+                gmin_y1 += 100
+
+        if a.gmaj:
+            gmaj_x1 = 500 - ((bounds[0]-1000)%500)
+            gmaj_x2 = bounds[2] - bounds[0] + 2000
+            gmaj_y1 = 500 if (bounds[3]+1000)%500 == 0 else (bounds[3]+1000)%500
+            gmaj_y2 = bounds[3] - bounds[1] + 2000
+            while gmaj_x1 < gmaj_x2:
+                out.write('<line x1="{0}" y1="0" x2="{0}" y2="{1}" stroke="{2}" stroke-thickness="{3}"/>\n'.format(gmaj_x1, gmaj_y2, colors[22], GRID_THICKNESS))
+                gmaj_x1 += 500
+            while gmaj_y1 < gmaj_y2:
+                out.write('<line x1="0" y1="{0}" x2="{1}" y2="{0}" stroke="{2}" stroke-thickness="{3}"/>\n'.format(gmaj_y1, gmaj_x2, colors[22], GRID_THICKNESS))
+                gmaj_y1 += 500
+
+
         unpaired = []
         netsegments = []
         for obj in parse['objects']:
