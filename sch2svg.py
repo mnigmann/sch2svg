@@ -42,8 +42,10 @@ p.add_argument("--colors", help="A file containing a list of colors")
 p.add_argument("-g", dest="gmin", action="store_true", help="Include minor grid lines every 100px")
 p.add_argument("-G", dest="gmaj", action="store_true", help="Include major grid lines every 500px")
 p.add_argument("-l", "--lib", nargs="*", action="store", help="Directories to be recursively searched for symbol files")
+p.add_argument("-t", "--thick", type=int, help="Minimum thickness of lines")
 a = p.parse_args()
-SYMBOLS += a.lib
+if a.lib: SYMBOLS += a.lib
+if a.thick: MIN_THICKNESS = a.thick
 print("Looking for symbols in", SYMBOLS, a.lib)
 in_file = a.in_file
 out_file = a.out_file or os.path.splitext(in_file)[0]+".svg"
